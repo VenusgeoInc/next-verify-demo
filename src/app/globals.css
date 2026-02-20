@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950;
+    @apply text-gray-900 dark:text-gray-100;
+    @apply min-h-screen;
+  }
+}

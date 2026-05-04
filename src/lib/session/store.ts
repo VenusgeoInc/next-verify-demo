@@ -146,5 +146,14 @@ class SessionStore {
   }
 }
 
-// Singleton instance
-export const sessionStore = new SessionStore();
+// Singleton instance with hot-reload protection
+// This ensures the same store instance persists across hot-reloads in development
+const globalForSessionStore = globalThis as unknown as {
+  sessionStore: SessionStore | undefined;
+};
+
+export const sessionStore = globalForSessionStore.sessionStore ?? new SessionStore();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForSessionStore.sessionStore = sessionStore;
+}

@@ -5,16 +5,19 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ResultDisplay from '@/components/ResultDisplay';
 import type { SessionData } from '@/lib/privateId/types';
+import { useNativeBridge } from '@/lib/hooks/useNativeBridge';
 
 function RedirectResultContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
+  const reason = searchParams.get('reason'); // Check for reason parameter
 
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
   const [hasTriggeredFallback, setHasTriggeredFallback] = useState(false);
+
 
   const triggerFallbackPolling = useCallback(async () => {
     if (!sessionId || hasTriggeredFallback) return;
@@ -79,6 +82,101 @@ function RedirectResultContent() {
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
+
+  // Add PUID to URL when webhook data arrives - this signals native to close
+  useEffect(() => {
+    console.log('[RedirectResult] 🔍 URL update check:', {
+      hasReason: !!reason,
+      reasonValue: reason,
+      hasSessionData: !!sessionData,
+      sessionStatus: sessionData?.status,
+      hasWebhookData: !!sessionData?.webhookData,
+      isLoading: loading,
+      currentSearchParams: searchParams.toString(),
+    });
+
+    // Need all these conditions before adding PUID to URL:
+    // 1. URL has reason parameter (indicates redirect from PrivateID)
+    // 2. Session data exists
+    // 3. Not currently loading
+    // 4. Has webhook data (confirmation we received response from PrivateID)
+    // 5. Final status (SUCCESS or FAILED)
+
+    if (!reason) {
+      console.log('[RedirectResult] ❌ URL not ready: No reason parameter');
+      return;
+    }
+
+    if (!sessionData) {
+      console.log('[RedirectResult] ⏳ URL not ready: No session data yet');
+      return;
+    }
+
+    if (loading) {
+      console.log('[RedirectResult] ⏳ URL not ready: Still loading');
+      return;
+    }
+
+    if (!sessionData.webhookData) {
+      console.log('[RedirectResult] ⏳ URL not ready: No webhook data yet (waiting for PrivateID response)');
+      return;
+    }
+
+    const status = sessionData.status;
+
+    if (status !== 'SUCCESS' && status !== 'FAILED') {
+      console.log('[RedirectResult] ⏳ URL not ready: Status is', status, '(not final)');
+      return;
+    }
+
+    // Check if we've already added PUID to URL
+    if (searchParams.get('puid') || searchParams.get('status')) {
+      console.log('[RedirectResult] ℹ️  PUID/status already in URL, skipping');
+      return;
+    }
+
+    // All conditions met! Add PUID or status to URL
+    const puid = sessionData.webhookData.puid;
+    const errorMessage = status === 'FAILED'
+      ? sessionData.webhookData?.message || sessionData.webhookData?.errors?.[0]?.message
+      : undefined;
+
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ ADDING PUID TO URL - WEBVIEW READY TO CLOSE');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Verification Status:', status);
+    console.log('PUID:', puid || 'N/A');
+    console.log('Reason from URL:', reason);
+    if (errorMessage) {
+      console.log('Error Message:', errorMessage);
+    }
+    console.log('Session ID:', sessionData.sessionId);
+    console.log('');
+
+    // Update URL with status and result data
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    if (status === 'SUCCESS' && puid) {
+      newParams.set('status', 'success');
+      newParams.set('puid', puid);
+      console.log('📝 Adding status=success and puid to URL:', puid);
+    } else if (status === 'FAILED') {
+      newParams.set('status', 'failed');
+      if (errorMessage) {
+        newParams.set('error', errorMessage);
+      }
+      console.log('📝 Adding status=failed and error to URL');
+    }
+
+    // Update URL without page reload
+    const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+
+    console.log('✅ URL updated:', newUrl);
+    console.log('');
+    console.log('💡 Native app can now detect status parameter and close the webview');
+    console.log('═══════════════════════════════════════════════════════════');
+  }, [reason, sessionData, loading, searchParams]);
 
   // Poll for updates every 2 seconds until webhook data arrives
   useEffect(() => {

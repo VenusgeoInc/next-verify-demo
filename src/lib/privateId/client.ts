@@ -39,7 +39,7 @@ export class PrivateIdClient {
       redirectURL: redirectUrl || '', // PrivateID requires this field
       locale: 'en-US',
       enableDesktop: true,
-      sendImages: false,
+      sendImages: true, // Enable to receive parsed document data (name, address, DOB, etc.)
       sendEventWebhooks: true,
       // Use provided requirements, or default: ENROLL = face + document, VERIFY = face only
       requirements: requirements || (sessionType === 'ENROLL' ? ['face', 'identity_document'] : ['face']),

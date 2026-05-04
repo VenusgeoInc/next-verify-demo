@@ -55,7 +55,7 @@ export async function POST(
       const normalizedStatus = webhookData.status.toUpperCase();
       if (normalizedStatus === 'SUCCESS' || normalizedStatus === 'COMPLETED') {
         sessionStatus = 'SUCCESS';
-      } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'ERROR') {
+      } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'ERROR' || normalizedStatus === 'FAILURE') {
         sessionStatus = 'FAILED';
       }
     }

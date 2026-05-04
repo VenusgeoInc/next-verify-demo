@@ -46,6 +46,10 @@ export interface WebhookPayload {
     code: string;
     message: string;
   };
+  errors?: Array<{
+    code: number | string;
+    message: string;
+  }>;
   timestamp?: string;
   [key: string]: any; // Allow additional fields
 }

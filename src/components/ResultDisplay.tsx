@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { SessionData } from '@/lib/privateId/types';
+import { useAutoSendPuid } from '@/lib/hooks/useNativeBridge';
 
 interface ResultDisplayProps {
   sessionData: SessionData;
@@ -9,6 +10,20 @@ interface ResultDisplayProps {
 
 export default function ResultDisplay({ sessionData }: ResultDisplayProps) {
   const [showRawJson, setShowRawJson] = useState(false);
+
+  // Automatically send result to native webview when verification completes
+  // SUCCESS: Sends PUID via uuid message
+  // FAILURE: Sends verification_complete message with error
+  const errorMessage = sessionData.webhookData?.message ||
+                      sessionData.webhookData?.errors?.[0]?.message;
+
+  useAutoSendPuid(
+    sessionData.sessionType,
+    sessionData.status,
+    sessionData.webhookData?.puid,
+    sessionData.webhookData?.guid,
+    errorMessage
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -67,6 +82,42 @@ export default function ResultDisplay({ sessionData }: ResultDisplayProps) {
           )}
         </div>
       </div>
+
+      {/* Error Messages */}
+      {sessionData.status === 'FAILED' && webhookData?.errors && webhookData.errors.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl p-6 shadow-sm">
+          <h3 className="font-semibold text-lg mb-4 text-red-900 dark:text-red-200 flex items-center gap-2">
+            <span className="text-xl">⚠️</span>
+            Verification Failed
+          </h3>
+          <div className="space-y-3">
+            {webhookData.errors.map((error, index) => (
+              <div
+                key={index}
+                className="bg-white dark:bg-red-950/30 border border-red-300 dark:border-red-700 rounded-lg p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                    <span className="text-red-700 dark:text-red-300 font-bold text-sm">
+                      {error.code || index + 1}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-red-900 dark:text-red-100 font-medium">
+                      {error.message}
+                    </p>
+                    {error.code && (
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                        Error Code: {error.code}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Identity & Contact Information */}
       {(identityInfo || contactInfo) && (

@@ -8,11 +8,12 @@ import type { SessionType, FlowType, SessionData } from '@/lib/privateId/types';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { sessionType, flowType, baseUrl, requirements } = body as {
+    const { sessionType, flowType, baseUrl, requirements, isWebView } = body as {
       sessionType: SessionType;
       flowType: FlowType;
       baseUrl?: string;
       requirements?: string[];
+      isWebView?: boolean;
     };
 
     // Validate input
@@ -50,10 +51,17 @@ export async function POST(request: NextRequest) {
     // Generate redirect URL with sessionId
     // PrivateID requires this even for iframe flows (as a fallback)
     // For iframe flow, user won't see this redirect, but API requires it
-    const redirectUrl =
-      flowType === 'redirect'
-        ? `${effectiveBaseUrl}/redirect-flow/result?sessionId=${internalSessionId}`
-        : `${effectiveBaseUrl}/iframe-flow?sessionId=${internalSessionId}`;
+    // For webview, use minimal result page
+    let redirectUrl: string;
+    if (flowType === 'redirect') {
+      if (isWebView) {
+        redirectUrl = `${effectiveBaseUrl}/webview/result?sessionId=${internalSessionId}`;
+      } else {
+        redirectUrl = `${effectiveBaseUrl}/redirect-flow/result?sessionId=${internalSessionId}`;
+      }
+    } else {
+      redirectUrl = `${effectiveBaseUrl}/iframe-flow?sessionId=${internalSessionId}`;
+    }
 
     // Generate customer ID (optional - using UUID for demo)
     const customerId = `customer-${randomUUID()}`;
